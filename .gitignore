@@ -1,0 +1,4 @@
+# Local multi-module development files. Every developer's paths differ, so these
+# are never committed - see go.work.example and README.md ("Local development").
+go.work
+go.work.sum

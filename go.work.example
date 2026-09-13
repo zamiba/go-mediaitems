@@ -1,0 +1,16 @@
+// Copy this into a CONSUMER application's checkout as go.work, with the paths
+// edited for your machine, when you need to edit this module and that program in
+// one pass. It overrides the tagged `require` without touching any committed
+// file, and deleting it puts the build back on the tagged version.
+//
+// go.work is gitignored in every repo in the suite: every developer's paths
+// differ, so this file is per-machine and never committed.
+//
+//	cd /path/to/consumer && go work init . && go work use /path/to/go-mediaitems
+
+go 1.25.0
+
+use (
+	.
+	../go-mediaitems
+)
