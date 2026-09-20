@@ -29,6 +29,7 @@ correctness property up.
 |---|---|---|
 | `storageunit` | complete | The shared StorageUnit list: the type, the five operations, `storage-units.json` with atomic writes and cross-process locking, and the cross-platform free-space probe. |
 | `checksum` | complete | The standard's five checksum fields as a struct, a one-pass multi-algorithm hasher, and the matching rules. |
+| `jsonfile` | complete | How the suite reads and writes a shared JSON file: the author's key order kept, unknown keys preserved, no HTML escaping, atomic and byte-stable writes. Used by `storageunit` and by dependent modules. |
 
 Planned, in order: the shared item index, `.mediaitem.json` (de)serialization
 and the MediaItem type graph, and ItemType name constants.
@@ -197,6 +198,42 @@ inside each unit — and anything new is appended rather than woven in. Imposing
 our order instead would turn merely opening the app into a diff nobody asked for.
 Paths are written literally, so a folder called `Rock & Roll` reads as itself
 rather than as `Rock \u0026 Roll`.
+
+---
+
+## `jsonfile`
+
+The handful of decisions layered on `encoding/json` that decide what bytes land
+on disk when the suite writes a JSON file people and several programs share.
+Not a JSON library; about 200 lines including the reasons.
+
+```go
+type Object struct { Order []string; Values map[string]json.RawMessage }
+
+func Decode(data []byte) (Object, error)            // keys in document order
+func (o *Object) Set(key string, value json.RawMessage)
+func (o *Object) SetString(key, value string) error  // no HTML escaping
+func (o Object) Clone() Object
+func (o Object) Compact(canonical ...string) ([]byte, error)
+func (o Object) Encode(canonical ...string) ([]byte, error)  // indented, trailing newline
+
+func String(s string) (json.RawMessage, error)
+func WriteAtomic(path string, data []byte) error
+func CreateExclusive(path string, data []byte) error  // fs.ErrExist if present
+```
+
+The ordering rule, which is the reason the package exists: **a file's own key
+order is kept**; keys in `canonical` that the file lacked are appended in that
+order; anything else is appended sorted. A brand-new file therefore gets the
+canonical order, and an existing file is never rearranged by a program that
+merely read it and wrote back one field.
+
+`Object` holds a map, so a struct copy shares it — `Clone` before setting keys
+on an object you also want to keep as read.
+
+These primitives existed as copies in two packages before this one, and the
+second copy had already drifted from the first. A file format is a contract
+between programs, and a contract with two implementations is two contracts.
 
 ---
 

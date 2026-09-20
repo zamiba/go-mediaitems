@@ -6,7 +6,22 @@ The module is `v0.x` while the API settles: a minor bump may break, and the
 entries below say when. Both consumers should pin the same version and move
 together.
 
-## [Unreleased]
+## [Unreleased] — v0.2.0
+
+### Added
+
+- **`jsonfile`** — the file layer that `storageunit` had carried privately,
+  exported so dependent modules (`go-mediaitems-profiles`) use the same code
+  rather than a copy: `Decode` preserving key order, `Object.Encode` with the
+  file's-order-then-canonical-then-sorted rule, `String` without HTML
+  escaping, `WriteAtomic`, `CreateExclusive`, `Clone`.
+
+### Changed
+
+- `storageunit` now uses `jsonfile`. Behaviour is identical — its own tests
+  pass unchanged — and `store.go` shrank from 390 lines to 215.
+
+## v0.1.0 — 2026-09-13
 
 ### Added
 
