@@ -6,7 +6,47 @@ The module is `v0.x` while the API settles: a minor bump may break, and the
 entries below say when. Both consumers should pin the same version and move
 together.
 
-## [Unreleased] — v0.2.0
+## v0.3.0 — 2026-09-29
+
+### Added
+
+- **`itemtitle`** — the MediaItem standard's `_itemTitle` rules, in one place
+  because they must produce byte-identical results in every program: a title
+  names the folder an item lives in on a StorageUnit *and* the same folder
+  inside every profile, so two implementations that disagree by one character
+  quietly file one item in two places.
+  - `SanitizeValue(v)` and `Compose(values...)` — the transformation, applied
+    to each field value **before** composing.
+  - `Valid`, `ValidFolderName`, `ValidSafe` — the checks, applied to a
+    *finished* string, which can only be accepted or rejected. A finished
+    `_itemTitle` cannot be repaired by sanitizing it again, because that would
+    remove its separators.
+  - `SameName` (case-folded collision test) and `Reserved` (names Windows
+    refuses for devices: `CON`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`, whatever
+    the extension). `ValidFolderName` rejects these, because the folder cannot
+    exist on Windows; `Valid` accepts them, because the standard makes a
+    reserved name a warning at the identifier level.
+  - `Warnings(s) []Warning` — acceptable but worth a person's attention:
+    a replacement character, a reserved name, full-width punctuation that
+    resembles a character the rules remove, and a zero-width joiner beside
+    Latin letters where it does nothing visible. A warning never decides
+    validity.
+  - `ErrEmptyValue` — a value that sanitizes to nothing, naming `safeTitle` as
+    the fix.
+- **`itemtitle/testdata/itemtitle.json`** — the suite's shared test table, 111
+  cases as data rather than as Go test code, so Omnidex's TypeScript runs the
+  same file instead of keeping a second set. Non-ASCII is written as escapes,
+  enforced by a test.
+
+### Changed
+
+- **New dependency: `golang.org/x/text` v0.41.0**, for Unicode NFC. There is no
+  NFC in the standard library, and the rule is unimplementable without it. It is
+  pinned to the go-1.25 generation like everything else here, and the `go`
+  directive is unchanged at 1.25.0. PortForge already had it via
+  `go-mediaitems-profiles`; Digitalizer gains it.
+
+## v0.2.0 — 2026-09-20
 
 ### Added
 

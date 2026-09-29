@@ -1,0 +1,153 @@
+{
+  "about": [
+    "The MediaItem standard's _itemTitle rules, as cases rather than prose.",
+    "This file is the shared reference: go-mediaitems runs it, and the TypeScript and any",
+    "other implementation should run the same file rather than keep a second set of cases.",
+    "Non-ASCII is written as \\u escapes on purpose. A file full of literal combining accents",
+    "is exactly the file an editor silently normalises, which would make the table agree with",
+    "itself and with nothing else."
+  ],
+  "sanitizeValue": [
+    { "input": "Face/Off", "want": "Face-Off", "note": "a slash stands between words, so it is replaced, not removed" },
+    { "input": "AC/DC", "want": "AC-DC", "note": "same" },
+    { "input": "M*A*S*H", "want": "MASH", "note": "an asterisk decorates inside one word, so it is removed" },
+    { "input": "Anima \u00b7 Animus", "want": "Anima - Animus", "note": "the standard's own separator cannot appear in a value" },
+    { "input": "WALL\u00b7E", "want": "WALL-E", "note": "unspaced separator; happens to give the usual spelling" },
+    { "input": ".hack//SIGN", "want": "hack--SIGN", "note": "leading dot stripped: it would hide the folder from ls, Finder and globs. The accurate rendering is a safeTitle of dothack" },
+    { "input": "A//B", "want": "A--B", "note": "runs of - are NOT collapsed; only runs of space are. A title may legitimately contain --" },
+    { "input": "Sonic 3 & Knuckles...", "want": "Sonic 3 & Knuckles", "note": "Windows silently drops a trailing dot, which would leave the folder not matching its own _itemTitle" },
+    { "input": "S.W.A.T.", "want": "S.W.A.T", "note": "interior dots survive; only the trailing one goes" },
+    { "input": "Lord of the Rings: The Fellowship of the Ring, The", "want": "Lord of the Rings The Fellowship of the Ring, The", "note": "the standard's own worked example" },
+    { "input": "Ratchet & Clank: Up Your Arsenal", "want": "Ratchet & Clank Up Your Arsenal", "note": "colons are ordinary in game titles" },
+    { "input": "Hello : World", "want": "Hello World", "note": "removing the colon leaves two spaces, which collapse to one" },
+    { "input": "Movie <2001>", "want": "Movie 2001", "note": "angle brackets removed" },
+    { "input": "-", "want": "-", "note": "Ed Sheeran's 2023 album. A leading - is kept: the standard reserves that prefix only inside MediaItem folders, and a MediaItem folder's parent is always an ItemType folder" },
+    { "input": "_hack", "want": "-hack", "note": "_ becomes -, and the resulting leading - is kept" },
+    { "input": "   spaced   ", "want": "spaced", "note": "trimmed" },
+    { "input": "a\u0009b", "want": "a b", "note": "TAB. A whitespace control becomes a space, NOT removed - removing it would weld the words" },
+    { "input": "a\u000Ab", "want": "a b", "note": "LF, same" },
+    { "input": "a\u00a0b", "want": "a b", "note": "NO-BREAK SPACE. Mapped before runs are collapsed, or implementations disagree about what counts as whitespace" },
+    { "input": "a\u3000b", "want": "a b", "note": "IDEOGRAPHIC SPACE" },
+    { "input": "a\u2028b", "want": "a b", "note": "LINE SEPARATOR" },
+    { "input": "Mar\u200bio", "want": "Mario", "note": "ZERO WIDTH SPACE removed: invisible, so two folder names would look identical and not be" },
+    { "input": "\ufeffTitle", "want": "Title", "note": "BOM removed" },
+    { "input": "Safe\u202eexe.txt", "want": "Safeexe.txt", "note": "RIGHT-TO-LEFT OVERRIDE removed. This is the filename-spoofing vector: it makes a name display in a different order than it is stored" },
+    { "input": "a\u0000b", "want": "ab", "note": "NUL removed" },
+    { "input": "a\u007Fb", "want": "ab", "note": "DEL removed; the old U+0000-U+001F clause missed it" },
+    { "input": "Bj\ufffdrn", "want": "Bj\ufffdrn", "note": "REPLACEMENT CHARACTER kept. It means an earlier step could not decode the bytes, so the character that was there is already lost. Dropping it would give Bjrn, which looks like a plausible name and launders the corruption; kept, the damage stays visible. Warnings reports it" },
+    { "input": "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645", "want": "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645", "note": "Persian with ZWNJ (U+200C) KEPT: without it the letters join and the word is misspelled" },
+    { "input": "\ud83e\uddd1\u200d\ud83d\ude80", "want": "\ud83e\uddd1\u200d\ud83d\ude80", "note": "emoji ZWJ sequence KEPT: stripping U+200D would turn one glyph into two" },
+    { "input": "Bjo\u0308rn", "want": "Bj\u00f6rn", "note": "NFD in, NFC out. HFS+ rewrites names to a decomposed form, so without a fixed form the same title gives folder names that do not match byte for byte" },
+    { "input": "Bj\u00f6rn", "want": "Bj\u00f6rn", "note": "already NFC; unchanged" },
+    { "input": "\uff1aTitle", "want": "\uff1aTitle", "note": "FULLWIDTH COLON survives on purpose. It is legal on every filesystem, and folding it would need NFKC, which would also mangle the full-width Latin that Japanese text uses legitimately. A homoglyph, not a hazard" },
+    { "input": "hack--SIGN", "want": "hack--SIGN", "note": "idempotence: sanitizing an already sanitized value changes nothing" }
+  ],
+  "sanitizeToEmpty": [
+    { "input": "***", "note": "nothing survives; Compose must reject this and name safeTitle as the fix" },
+    { "input": "...", "note": "all dots are trailing" },
+    { "input": ":", "note": "" },
+    { "input": "   ", "note": "" },
+    { "input": "\u200b", "note": "" },
+    { "input": "", "note": "" }
+  ],
+  "compose": [
+    {
+      "values": ["Lord of the Rings: The Fellowship of the Ring, The", "2001"],
+      "want": "Lord of the Rings The Fellowship of the Ring, The \u00b7 2001",
+      "note": "the Movie format, [sortTitle] \u00b7 [releaseYear]"
+    },
+    {
+      "values": ["Ed Sheeran", "-", "2023"],
+      "want": "Ed Sheeran \u00b7 - \u00b7 2023",
+      "note": "a MusicAlbum whose title is a single hyphen composes fine"
+    },
+    {
+      "values": ["Ship of Harkinian", "2022"],
+      "want": "Ship of Harkinian \u00b7 2022",
+      "note": ""
+    }
+  ],
+  "composeError": [
+    { "values": ["***", "2001"], "note": "a value that sanitizes to empty is an error, not an empty component" },
+    { "values": [], "note": "nothing to compose" }
+  ],
+  "valid": [
+    { "input": "Lord of the Rings The Fellowship of the Ring, The \u00b7 2001", "want": true, "note": "" },
+    { "input": "-hack \u00b7 2002", "want": true, "note": "a leading - is fine on a MediaItem folder" },
+    { "input": "S.W.A.T \u00b7 2003", "want": true, "note": "interior dots are fine" },
+    { "input": "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645 \u00b7 2011", "want": true, "note": "ZWNJ is allowed" },
+    { "input": ".hack \u00b7 2002", "want": false, "note": "leading dot" },
+    { "input": "Movie \u00b7 2001.", "want": false, "note": "trailing dot" },
+    { "input": "Movie \u00b7 2001 ", "want": false, "note": "trailing space" },
+    { "input": " Movie \u00b7 2001", "want": false, "note": "leading space" },
+    { "input": "Movie  \u00b7 2001", "want": false, "note": "doubled space" },
+    { "input": "Movie_2001", "want": false, "note": "_ belongs to the suffix, which Valid does not take; use ValidFolderName" },
+    { "input": "Movie/2001", "want": false, "note": "" },
+    { "input": "Movie:2001", "want": false, "note": "" },
+    { "input": "Mar\u200bio \u00b7 2001", "want": false, "note": "zero-width space" },
+    { "input": "Bjo\u0308rn \u00b7 2001", "want": false, "note": "not NFC" },
+    { "input": "", "want": false, "note": "" },
+    { "input": ".", "want": false, "note": "" },
+    { "input": "..", "want": false, "note": "" },
+    { "input": "CON", "want": true, "note": "Valid asks whether the identifier CONFORMS, and the standard makes a reserved name a warning. ValidFolderName asks whether the folder can exist, and answers no" },
+    { "input": "Bj\ufffdrn \u00b7 2001", "want": true, "note": "corruption is visible rather than blocking; Warnings reports it" }
+  ],
+  "warnings": [
+    { "input": "Bj\ufffdrn", "want": ["replacement-character"], "note": "" },
+    { "input": "CON", "want": ["reserved-name"], "note": "" },
+    { "input": "Movie\uff1a2001", "want": ["fullwidth-punctuation"], "note": "a full-width colon, which looks like the ordinary one the rules remove" },
+    { "input": "Movie\u30fb2001", "want": ["fullwidth-punctuation"], "note": "KATAKANA MIDDLE DOT, which resembles the standard own separator" },
+    { "input": "Sam\u200cSpade", "want": ["stray-joiner"], "note": "beside Latin letters a joiner does nothing visible, so this looks exactly like SamSpade" },
+    { "input": "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645", "want": [], "note": "the same joiner between Persian letters is doing its job; no warning" },
+    { "input": "\ud83e\uddd1\u200d\ud83d\ude80", "want": [], "note": "an emoji sequence held together by a joiner; no warning" },
+    { "input": "Lord of the Rings The Fellowship of the Ring, The \u00b7 2001", "want": [], "note": "an ordinary title warns about nothing" },
+    { "input": "NUL\ufffd", "want": ["replacement-character"], "note": "not a reserved name once the replacement character is part of it" }
+  ],
+  "validFolderName": [
+    { "input": "Lord of the Rings The Fellowship of the Ring, The \u00b7 2001", "want": true, "note": "no suffix" },
+    { "input": "Lord of the Rings The Fellowship of the Ring, The \u00b7 2001_tt0120737", "want": true, "note": "suffix ignored for conformance" },
+    { "input": "Movie \u00b7 2001_anything at all: really", "want": true, "note": "a suffix value is whatever field the cataloguer found distinguishing" },
+    { "input": "Movie \u00b7 2001_../../../etc/cron.d/x", "want": false, "note": "path safety applies to the WHOLE string, suffix included. Ignoring the suffix for conformance must never mean joining it unchecked" },
+    { "input": "Movie \u00b7 2001_a\\b", "want": false, "note": "same, backslash" },
+    { "input": "_tt0120737", "want": false, "note": "empty _itemTitle" },
+    { "input": ".hack \u00b7 2002_tt1", "want": false, "note": "the head is invalid" },
+    { "input": "CON", "want": false, "note": "Windows reserves this for a device, so the folder cannot exist there and the storage unit stops being portable" },
+    { "input": "nul.txt", "want": false, "note": "reserved whatever the extension" },
+    { "input": "Movie \u00b7 2001_CON", "want": true, "note": "the reservation is the WHOLE name, so a suffix that happens to be one is fine" },
+    { "input": "Con Air \u00b7 1997", "want": true, "note": "a device name as a word in a title is fine" }
+  ],
+  "validSafe": [
+    { "input": "dothack", "want": true, "note": "the case the field exists for" },
+    { "input": "M-A-S-H", "want": true, "note": "" },
+    { "input": "Lord of the Rings, The", "want": true, "note": "a comma, for sort order" },
+    { "input": "Assassin's Creed", "want": true, "note": "an apostrophe" },
+    { "input": "WALL-E (2008)", "want": true, "note": "parentheses and a hyphen" },
+    { "input": "Ratchet & Clank", "want": true, "note": "an ampersand" },
+    { "input": "S.W.A.T", "want": true, "note": "interior dot" },
+    { "input": "Bj\u00f6rn", "want": true, "note": "letters are Unicode, not ASCII" },
+    { "input": "\u3042\u3044\u3046", "want": true, "note": "a Japanese safeTitle stays Japanese" },
+    { "input": "\u0645\u06cc\u200c\u062e\u0648\u0627\u0647\u0645", "want": true, "note": "ZWNJ, so a Persian safeTitle can be spelled correctly" },
+    { "input": "Movie \u00b7 2001", "want": false, "note": "the separator is not allowed in a value, safe or not" },
+    { "input": "Movie_2001", "want": false, "note": "" },
+    { "input": ".hack", "want": false, "note": "leading dot" },
+    { "input": "Movie.", "want": false, "note": "trailing dot" },
+    { "input": "a  b", "want": false, "note": "doubled space" },
+    { "input": "a/b", "want": false, "note": "" },
+    { "input": "Bjo\u0308rn", "want": false, "note": "not NFC" },
+    { "input": "", "want": false, "note": "" }
+  ],
+  "sameName": [
+    { "a": "Alien \u00b7 1979", "b": "ALIEN \u00b7 1979", "want": true, "note": "Windows and macOS see one folder here, Linux sees two" },
+    { "a": "Bjo\u0308rn", "b": "Bj\u00f6rn", "want": true, "note": "normalisation before folding" },
+    { "a": "Alien \u00b7 1979", "b": "Aliens \u00b7 1986", "want": false, "note": "" }
+  ],
+  "reserved": [
+    { "input": "CON", "want": true, "note": "a validator warning, not an error" },
+    { "input": "nul.txt", "want": true, "note": "reserved whatever the extension" },
+    { "input": "COM1", "want": true, "note": "" },
+    { "input": "COM0", "want": false, "note": "only 1-9" },
+    { "input": "Con \u00b7 2019", "want": false, "note": "the reservation is the whole name, so an ordinary title containing it is fine" },
+    { "input": "CONSOLE", "want": false, "note": "" },
+    { "input": "CON.", "want": true, "note": "Windows ignores trailing dots when matching" }
+  ]
+}

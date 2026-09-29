@@ -30,9 +30,10 @@ correctness property up.
 | `storageunit` | complete | The shared StorageUnit list: the type, the five operations, `storage-units.json` with atomic writes and cross-process locking, and the cross-platform free-space probe. |
 | `checksum` | complete | The standard's five checksum fields as a struct, a one-pass multi-algorithm hasher, and the matching rules. |
 | `jsonfile` | complete | How the suite reads and writes a shared JSON file: the author's key order kept, unknown keys preserved, no HTML escaping, atomic and byte-stable writes. Used by `storageunit` and by dependent modules. |
+| `itemtitle` | complete | The standard's `_itemTitle` rules: sanitizing a field value, composing a title from several, and validating one you were handed. Carries the suite's shared test table. |
 
-Planned, in order: the shared item index, `.mediaitem.json` (de)serialization
-and the MediaItem type graph, and ItemType name constants.
+Planned, in order: `.mediaitem.json` (de)serialization and the MediaItem type
+graph, the shared item index, and ItemType name constants.
 
 Anything that reads hardware, drives a subprocess, or paints a screen stays in
 the application. Shared *data shapes* and the *storage/identity* logic that must
@@ -234,6 +235,150 @@ on an object you also want to keep as read.
 These primitives existed as copies in two packages before this one, and the
 second copy had already drifted from the first. A file format is a contract
 between programs, and a contract with two implementations is two contracts.
+
+---
+
+## `itemtitle`
+
+The standard's rules for turning field values into an `_itemTitle`, and for
+checking one you were handed.
+
+These live here rather than in each program because they must produce
+**byte-identical** results everywhere. An `_itemTitle` names the folder an item
+lives in on a StorageUnit, and the same folder inside every profile. Two
+implementations that disagree by one character do not fail — they quietly file
+the same item in two places, on two devices, and nothing ever says so.
+
+### Public API
+
+```go
+const Separator = " · "
+
+func SanitizeValue(v string) string              // one field value, before composing
+func Compose(values ...string) (string, error)   // sanitize each, join with Separator
+
+func Valid(itemTitle string) bool                // a finished _itemTitle
+func ValidFolderName(name string) bool           // "[_itemTitle]" or "[_itemTitle]_[suffix]"
+func ValidSafe(s string) bool                    // a safeTitle / safeSortTitle
+
+func SameName(a, b string) bool                  // do two folder names collide?
+func Reserved(name string) bool                  // a name Windows refuses
+func Warnings(s string) []Warning                // acceptable, but worth a person's attention
+
+var ErrEmptyValue, ErrNoValues error
+```
+
+### Two operations, which must not be confused
+
+This is the one thing to get right, and the standard says it explicitly:
+
+- **Sanitizing** transforms a *field value*, **before** it is composed. That is
+  `SanitizeValue`, and `Compose` does the composition.
+- **Validating** checks a *finished* string. A finished `_itemTitle` can never
+  be repaired by sanitizing it again, because that would remove its separators
+  and silently produce a different folder than the composer intended. It can
+  only be accepted or rejected.
+
+The natural mistake is to write one function and apply it in both places.
+
+### What the rules are
+
+Applied in order, to each field value:
+
+1. **Normalize to NFC.** Not a nicety: HFS+ rewrites names to a decomposed
+   form, so without a fixed form the same title gives folder names that do not
+   match byte for byte.
+2. **Any whitespace becomes a plain space** — every Unicode space separator,
+   and the whitespace *control* characters (tab, newline) too. Those are
+   category `C` and would otherwise be removed in step 3, welding the words on
+   either side together.
+3. **Remove the rest of category `C`** — control, format, private-use,
+   surrogate — **except U+200C (ZWNJ) and U+200D (ZWJ)**. That covers DEL, the
+   C1 range, the zero-width characters that make two folder names look
+   identical, and the bidirectional overrides that let a name *display* in a
+   different order than it is stored. The two joiners stay because they carry
+   meaning: without its ZWNJ a Persian word is misspelled, and an emoji ZWJ
+   sequence is one glyph only while the joiner is there.
+4. **Replace `/ \ | _ ·` with `-`.** These stand between words, so removing
+   them would weld them: `Face/Off` is `Face-Off`. `_` and `·` are the
+   standard's own punctuation — the suffix separator and the `_itemTitle`
+   separator — which is why no field value may hold one.
+5. **Remove `: * ? " < >`**, which decorate or end a word: `M*A*S*H` is `MASH`.
+6. **Collapse runs of spaces**, and trim spaces and dots from both ends.
+
+Runs of `-` are **not** collapsed, because a title may legitimately contain
+`--`. A leading `.` goes, because it would hide the folder from `ls`, from
+Finder and from shell globs — and `.mediaitem.json` and `.artwork/` are
+themselves dotfiles, so a walker that is right to skip those would lose the
+whole item. A leading `-` **stays**: the standard reserves that prefix for
+ItemType folders inside a MediaItem folder, which is a different place in the
+tree, and every entry inside an ItemType folder is a MediaItem folder.
+
+### A value can sanitize to nothing, and that is an error
+
+`***` holds nothing that survives. `Compose` returns `ErrEmptyValue` rather
+than composing `" · 2001"`, because an item whose whole title is punctuation
+has no human-readable identifier — which is what an `_itemTitle` is for. The
+error names `safeTitle` as the fix, since that is the one thing the cataloguer
+needs to know.
+
+### Valid, warnings, and the difference between them
+
+Three of the rules here met the same question — when the rule meets something
+suspicious, do we silently fix it, silently allow it, or refuse it? — and the
+answer in every case is the fourth option, which the standard already has and a
+`bool` cannot express:
+
+| Case | `Valid` | `ValidFolderName` | `Warnings` |
+|---|---|---|---|
+| `CON` — a name Windows reserves for a device | accepts | **rejects** | warns |
+| `Bj<U+FFFD>rn` — the bytes could not be decoded | accepts | accepts | warns |
+| `Movie：2001` — a full-width colon, not the ASCII one | accepts | accepts | warns |
+| `Sam<ZWNJ>Spade` — an invisible joiner beside Latin letters | accepts | accepts | warns |
+
+`Valid` asks whether the identifier **conforms**, which is the standard's
+question and where a reserved name is a warning. `ValidFolderName` asks whether
+the folder **can exist**, and on Windows `CON` cannot — the whole justification
+for the character rules is that a StorageUnit survives being copied between
+filesystems, and a name that cannot exist on one of the three fails that test
+exactly as `?` does.
+
+**The replacement character is kept on purpose.** `U+FFFD` is what a decoder
+writes when it cannot read the bytes it was given, so `Bj<U+FFFD>rn` is a
+`Björn` whose `ö` was destroyed before this package saw it. Removing it would
+give `Bjrn` — a plausible-looking name that no longer looks corrupt at all.
+Laundering the damage is worse than carrying it, especially into a folder name,
+which outlives the conversation about it. Kept and warned about, a person can
+see it and fix the data at its source.
+
+### `ValidFolderName` is two checks, and only one is the standard's
+
+A MediaItem folder is `[_itemTitle]` or `[_itemTitle]_[field value]`, where the
+suffix disambiguates two items that would otherwise collide.
+
+- **Conformance**, on the part before the `_` only. Everything from the suffix
+  onward is ignored, because a suffix value may be whatever field the
+  cataloguer found distinguishing.
+- **Path safety**, on the whole string, always. A name arrives from a
+  `.mediaitem.json` somebody else wrote, so ignoring the suffix for conformance
+  must never mean joining it onto a path unchecked.
+
+It also rejects the names Windows reserves. The reservation is the whole name,
+so `Con Air · 1997` is fine and `Movie · 2001_CON` is fine; only a folder
+called exactly `CON`, `NUL`, `COM3` and so on is refused.
+
+### The test table is shared, and is not Go
+
+`itemtitle/testdata/itemtitle.json` holds every case — 111 of them — as data
+rather than as Go test code, because the TypeScript implementation runs the
+same file. A case that exists only here is a case the other implementations
+cannot check themselves against.
+
+Non-ASCII in it is written as `\u` escapes deliberately. A file full of
+literal combining accents — and of zero-width and bidirectional characters —
+is exactly the file an editor silently normalizes, which would make the table
+agree with itself and with nothing else. `TestTableIsPureASCII` enforces it, so
+the rule is not left to whoever edits the file next.
 
 ---
 
