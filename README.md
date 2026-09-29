@@ -264,6 +264,7 @@ func ValidSafe(s string) bool                    // a safeTitle / safeSortTitle
 func SameName(a, b string) bool                  // do two folder names collide?
 func Reserved(name string) bool                  // a name Windows refuses
 func Warnings(s string) []Warning                // acceptable, but worth a person's attention
+func PathSafe(s string) bool                     // the security floor, alone — rarely what you want
 
 var ErrEmptyValue, ErrNoValues error
 ```
@@ -363,13 +364,24 @@ suffix disambiguates two items that would otherwise collide.
   `.mediaitem.json` somebody else wrote, so ignoring the suffix for conformance
   must never mean joining it onto a path unchecked.
 
+`PathSafe` is that second check on its own, exported because a few names in the
+suite are **not** `_itemTitle`s and must not be held to the standard's rule — a
+profile slug is the example, since it is deliberately reductive and already
+exists in folders on people's machines, so refusing one would make an existing
+profile unreachable rather than prevent a bad one. It is the security floor and
+nothing else: `PathSafe("CON")` and `PathSafe(".hack")` are both true. Reach for
+it only when you can say why the fuller check is wrong; if you cannot,
+`ValidFolderName` is the answer. A test asserts that everything
+`ValidFolderName` accepts is path-safe, so the floor can never be the looser of
+the two.
+
 It also rejects the names Windows reserves. The reservation is the whole name,
 so `Con Air · 1997` is fine and `Movie · 2001_CON` is fine; only a folder
 called exactly `CON`, `NUL`, `COM3` and so on is refused.
 
 ### The test table is shared, and is not Go
 
-`itemtitle/testdata/itemtitle.json` holds every case — 111 of them — as data
+`itemtitle/testdata/itemtitle.json` holds every case — 123 of them — as data
 rather than as Go test code, because the TypeScript implementation runs the
 same file. A case that exists only here is a case the other implementations
 cannot check themselves against.

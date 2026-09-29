@@ -6,6 +6,27 @@ The module is `v0.x` while the API settles: a minor bump may break, and the
 entries below say when. Both consumers should pin the same version and move
 together.
 
+## v0.4.0 — 2026-09-29
+
+### Added
+
+- **`itemtitle.PathSafe(s) bool`** — the path-safety half of
+  `ValidFolderName`, on its own. Purely additive; nothing else changed.
+
+  It exists because a few names in the suite are not `_itemTitle`s and must not
+  be held to the standard's rule. A profile slug is the case: it is
+  deliberately reductive, and it is an identity that already exists in folders
+  on people's machines, so rejecting one would make an existing profile
+  unreachable rather than prevent a bad one. Before this,
+  `go-mediaitems-profiles` kept its own `isFolderName` for exactly that — a
+  second implementation of "is this one safe folder name", which is the thing
+  this module exists to stop.
+
+  It is the security floor and nothing more: `PathSafe("CON")` and
+  `PathSafe(".hack")` are both true. A test asserts that everything `Valid` or
+  `ValidFolderName` accepts is also path-safe, so the floor can never become
+  the looser of the two.
+
 ## v0.3.0 — 2026-09-29
 
 ### Added

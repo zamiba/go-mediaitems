@@ -218,7 +218,7 @@ func Valid(s string) bool {
 //     .mediaitem.json somebody else wrote, so ignoring the suffix for
 //     conformance must never mean joining it onto a path unchecked.
 func ValidFolderName(name string) bool {
-	if !pathSafe(name) {
+	if !PathSafe(name) {
 		return false
 	}
 	// A name Windows reserves cannot be a folder there at all, and the whole
@@ -238,11 +238,23 @@ func ValidFolderName(name string) bool {
 	return Valid(head)
 }
 
-// pathSafe reports whether s can only ever name one folder directly inside
-// another. It holds for every part of the name, suffix included, and it is
-// not a conformance check - it is what stands between a hand-written
-// .mediaitem.json and a path outside the folder it was meant for.
-func pathSafe(s string) bool {
+// PathSafe reports whether s can only ever name one folder directly inside
+// another: not empty, not "." or "..", no separator of either kind, and no
+// control characters. It is what stands between a name somebody else wrote and
+// a path outside the folder it was meant for.
+//
+// **This is not the check you want for an item title.** It says nothing about
+// whether a name conforms to the standard, whether it can exist on Windows, or
+// whether two devices would spell it the same way - ValidFolderName asks all
+// of that and this as well. PathSafe is for the names the standard does not
+// define, which need the security floor and must not be held to the rest:
+// a profile slug is the example, because it is deliberately reductive and
+// already exists in folders on people's machines, so refusing one would make
+// an existing profile unreachable rather than prevent a bad one.
+//
+// Reach for it only when you can say why the fuller check is wrong. If you
+// cannot, ValidFolderName is the answer.
+func PathSafe(s string) bool {
 	if s == "" || s == "." || s == ".." {
 		return false
 	}

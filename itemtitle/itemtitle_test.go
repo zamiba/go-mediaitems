@@ -56,6 +56,11 @@ type table struct {
 		Want  []string
 		Note  string
 	} `json:"warnings"`
+	PathSafe []struct {
+		Input string
+		Want  bool
+		Note  string
+	} `json:"pathSafe"`
 }
 
 func load(t *testing.T) table {
@@ -274,6 +279,31 @@ func TestTableIsPureASCII(t *testing.T) {
 	for i, b := range body {
 		if b > 127 {
 			t.Fatalf("testdata/itemtitle.json byte %d is 0x%02X; non-ASCII must be written as an escape", i, b)
+		}
+	}
+}
+
+func TestPathSafe(t *testing.T) {
+	for _, c := range load(t).PathSafe {
+		if got := PathSafe(c.Input); got != c.Want {
+			t.Errorf("PathSafe(%q) = %v, want %v\n  %s", c.Input, got, c.Want, c.Note)
+		}
+	}
+}
+
+// PathSafe is the floor, not the check. Anything ValidFolderName accepts must
+// be path-safe, or the fuller check would be letting something through that
+// the floor would have caught.
+func TestValidFolderNameImpliesPathSafe(t *testing.T) {
+	tb := load(t)
+	for _, c := range tb.ValidFolderName {
+		if c.Want && !PathSafe(c.Input) {
+			t.Errorf("ValidFolderName(%q) is true but PathSafe is false", c.Input)
+		}
+	}
+	for _, c := range tb.Valid {
+		if c.Want && !PathSafe(c.Input) {
+			t.Errorf("Valid(%q) is true but PathSafe is false", c.Input)
 		}
 	}
 }

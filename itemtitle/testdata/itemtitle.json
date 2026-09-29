@@ -116,6 +116,20 @@
     { "input": "Movie \u00b7 2001_CON", "want": true, "note": "the reservation is the WHOLE name, so a suffix that happens to be one is fine" },
     { "input": "Con Air \u00b7 1997", "want": true, "note": "a device name as a word in a title is fine" }
   ],
+  "pathSafe": [
+    { "input": "Movie \u00b7 2001", "want": true, "note": "" },
+    { "input": "CON", "want": true, "note": "PathSafe is the security floor only. A reserved name cannot be a folder on Windows, which is ValidFolderName's business, not this one" },
+    { "input": ".hack--SIGN", "want": true, "note": "a hidden folder is a conformance problem, not a traversal one" },
+    { "input": "sam-s-profile", "want": true, "note": "a profile slug, which is deliberately not held to the standard's rule" },
+    { "input": "", "want": false, "note": "" },
+    { "input": ".", "want": false, "note": "" },
+    { "input": "..", "want": false, "note": "the one this exists for" },
+    { "input": "../../etc/cron.d/x", "want": false, "note": "" },
+    { "input": "a/b", "want": false, "note": "" },
+    { "input": "a\\b", "want": false, "note": "a backslash, which is a separator on Windows" },
+    { "input": "a\u0000b", "want": false, "note": "a control character is never safe in a name, whatever else is true of it" },
+    { "input": "a\u007Fb", "want": false, "note": "DEL" }
+  ],
   "validSafe": [
     { "input": "dothack", "want": true, "note": "the case the field exists for" },
     { "input": "M-A-S-H", "want": true, "note": "" },
